@@ -1,0 +1,27 @@
+apiVersion: skaffold/v4beta2
+kind: Config
+build:
+  tagPolicy:
+    envTemplate:
+      template: "{{.SDP_DEVID}}"
+  artifacts:
+    - image: datahub-gms-inc
+      docker:
+        dockerfile: /home/matthias/projects/datahub/docker/datahub-gms/Dockerfile
+  local:
+    push: true
+    useDockerCLI: true
+deploy:
+  helm:
+    releases:
+      - name: my-datahub
+        setValueTemplates:
+          datahub-gms.image.repository: "{{.IMAGE_REPO}}"
+          datahub-gms.image.tag: "{{.IMAGE_TAG}}@{{.IMAGE_DIGEST}}"
+        setValues:
+          datahubUpgrade.enabled: false
+          global.graph_service_impl: elasticsearch
+          elasticsearchSetupJob.enabled: false
+          kafkaSetupJob.enabled: false
+        chartPath: /home/matthias/projects/datahub-helm/charts/datahub
+        namespace: sdp-data-lakehouse-collection-app-degeyt70
