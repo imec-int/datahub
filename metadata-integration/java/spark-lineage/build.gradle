@@ -173,7 +173,7 @@ publishing {
         scm {
           connection = 'scm:git:git://github.com/imec-int/datahub.git'
           developerConnection = 'scm:git:ssh://github.com:imec-int/datahub.git'
-          url = 'https://github.com/datahub-project/datahub.git'
+          url = 'https://github.com/imec-int/datahub.git'
         }
 
         licenses {
