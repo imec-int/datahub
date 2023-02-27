@@ -158,9 +158,9 @@ publishing {
         artifacts = [ shadowJar, javadocJar, sourcesJar ]
 
         scm {
-          connection = 'scm:git:git://github.com/datahub-project/datahub.git'
-          developerConnection = 'scm:git:ssh://github.com:datahub-project/datahub.git'
-          url = 'https://github.com/datahub-project/datahub.git'
+          connection = 'scm:git:git://github.com/imec-int/datahub.git'
+          developerConnection = 'scm:git:ssh://github.com:imec-int/datahub.git'
+          url = 'https://github.com/imec-int/datahub.git'
         }
 
         licenses {
@@ -183,30 +183,36 @@ publishing {
 
   repositories {
     maven {
-      def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
-      def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-      def ossrhUsername = System.getenv('RELEASE_USERNAME')
-      def ossrhPassword = System.getenv('RELEASE_PASSWORD')
-      credentials {
-        username ossrhUsername
-        password ossrhPassword
-      }
-      url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+        name = "GitHubPackages"
+        url = "https://maven.pkg.github.com/imec-int/datahub"
+        credentials {
+            username = "imec-int"
+            password = System.getenv("PACKAGES_TOKEN")
+        }
+//      def releasesRepoUrl = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+//      def snapshotsRepoUrl = "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+//      def ossrhUsername = System.getenv('RELEASE_USERNAME')
+//      def ossrhPassword = System.getenv('RELEASE_PASSWORD')
+//      credentials {
+//        username ossrhUsername
+//        password ossrhPassword
+//      }
+//      url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
     }
   }
 }
 
-signing {
-    def signingKey = findProperty("signingKey")
-    def signingPassword = System.getenv("SIGNING_PASSWORD")
-    useInMemoryPgpKeys(signingKey, signingPassword)
-    sign publishing.publications.shadow
-}
-
-nexusStaging {
-    serverUrl = "https://s01.oss.sonatype.org/service/local/" //required only for projects registered in Sonatype after 2021-02-24
-    username = System.getenv("NEXUS_USERNAME")
-    password = System.getenv("NEXUS_PASSWORD")
-}
+//signing {
+//    def signingKey = findProperty("signingKey")
+//    def signingPassword = System.getenv("SIGNING_PASSWORD")
+//    useInMemoryPgpKeys(signingKey, signingPassword)
+//    sign publishing.publications.shadow
+//}
+//
+//nexusStaging {
+//    serverUrl = "https://s01.oss.sonatype.org/service/local/" //required only for projects registered in Sonatype after 2021-02-24
+//    username = System.getenv("NEXUS_USERNAME")
+//    password = System.getenv("NEXUS_PASSWORD")
+//}
 
 
