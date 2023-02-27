@@ -88,8 +88,7 @@ def write_gms_config(
             # ok to fail on this
             previous_config = {}
             log.debug(
-                f"Failed to retrieve config from file {DATAHUB_CONFIG_PATH}. This isn't fatal.",
-                e,
+                f"Failed to retrieve config from file {DATAHUB_CONFIG_PATH}: {e}. This isn't fatal."
             )
         config_dict = {**previous_config, **config.dict()}
     else:
@@ -386,7 +385,7 @@ def get_urns_by_filter(
     ):
         filter_criteria.append(
             {
-                "field": "platform",
+                "field": "platform.keyword",
                 "value": f"urn:li:dataPlatform:{platform}",
                 "condition": "EQUAL",
             }
@@ -687,8 +686,6 @@ def get_aspects_for_entity(
         aspect_py_class: Optional[Type[Any]] = _get_pydantic_class_from_aspect_name(
             aspect_name
         )
-        if aspect_name == "unknown":
-            print(f"Failed to find aspect_name for class {aspect_name}")
 
         aspect_dict = a["value"]
         if not typed:
@@ -699,8 +696,32 @@ def get_aspects_for_entity(
                 aspect_map[aspect_name] = aspect_py_class.from_obj(post_json_obj)
             except Exception as e:
                 log.error(f"Error on {json.dumps(aspect_dict)}", e)
+        else:
+            log.debug(f"Failed to find class for aspect {aspect_name}")
 
     if aspects:
         return {k: v for (k, v) in aspect_map.items() if k in aspects}
     else:
         return dict(aspect_map)
+
+
+def make_shim_command(name: str, suggestion: str) -> click.Command:
+    @click.command(
+        name=name,
+        context_settings=dict(
+            ignore_unknown_options=True,
+            allow_extra_args=True,
+        ),
+    )
+    @click.pass_context
+    def command(ctx: click.Context) -> None:
+        """<disabled due to missing dependencies>"""
+
+        click.secho(
+            "This command is disabled due to missing dependencies. "
+            f"Please {suggestion} to enable it.",
+            fg="red",
+        )
+        ctx.exit(1)
+
+    return command
