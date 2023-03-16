@@ -323,6 +323,7 @@ public class UpdateIndicesHook implements MetadataChangeLogHook {
       }
       edgesToAdd.forEach(_graphService::addEdge);
     }
+    _graphService.addEntity(urn, aspect, aspectSpec);
   }
 
   private void updateGraphServiceDiff(

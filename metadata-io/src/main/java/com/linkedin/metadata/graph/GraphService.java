@@ -1,6 +1,8 @@
 package com.linkedin.metadata.graph;
 
 import com.linkedin.common.urn.Urn;
+import com.linkedin.data.template.RecordTemplate;
+import com.linkedin.metadata.models.AspectSpec;
 import com.linkedin.metadata.models.registry.LineageRegistry;
 import com.linkedin.metadata.query.filter.Filter;
 import com.linkedin.metadata.query.filter.RelationshipDirection;
@@ -30,6 +32,12 @@ public interface GraphService {
    * Adds an edge to the graph. This creates the source and destination nodes, if they do not exist.
    */
   void addEdge(final Edge edge);
+
+  void addEntity(
+      @Nonnull final Urn urn,
+      @Nonnull final RecordTemplate aspect,
+      @Nonnull final AspectSpec aspectSpec
+  );
 
   /**
    * Adds or updates an edge to the graph. This creates the source and destination nodes, if they do not exist.

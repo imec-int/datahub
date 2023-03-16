@@ -78,4 +78,8 @@ public class FieldExtractor {
         .forEach(extractedFields::putAll);
     return extractedFields;
   }
+
+  public static String getArrayWildcard() {
+    return ARRAY_WILDCARD;
+  }
 }

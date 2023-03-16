@@ -18,11 +18,18 @@ ext {
     debug_modules = quickstart_modules - [':metadata-jobs:mce-consumer-job',
                                           ':metadata-jobs:mae-consumer-job']
     debug_compose_args = [
-            '-f', 'docker-compose-without-neo4j.yml',
-            '-f', 'docker-compose-without-neo4j.override.yml',
-            '-f', 'docker-compose-without-neo4j.m1.yml', // updates to mariadb
+            '-f', 'docker-compose.yml',
+            '-f', 'docker-compose.override.yml',
+            '-f', 'docker-compose.m1.yml', // updates to mariadb
             '-f', 'docker-compose.dev.yml'
     ]
+
+    // debug_compose_args = [
+    // '-f', 'docker-compose-without-neo4j.yml',
+    // '-f', 'docker-compose-without-neo4j.override.yml',
+    // '-f', 'docker-compose-without-neo4j.m1.yml', // updates to mariadb
+    // '-f', 'docker-compose.dev.yml'
+    // ]
     debug_reloadable = [
             'datahub-gms',
             'datahub-frontend-react'
