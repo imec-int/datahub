@@ -1,6 +1,7 @@
 package com.linkedin.metadata.graph.neo4j;
 
 import com.codahale.metrics.Timer;
+import com.datahub.util.RecordUtils;
 import com.datahub.util.Statement;
 import com.datahub.util.exception.RetryLimitReached;
 import com.google.common.annotations.VisibleForTesting;
@@ -86,9 +87,6 @@ public class Neo4jGraphService implements GraphService {
 
   @Override
   public void addEdge(@Nonnull final Edge edge) {
-    if (true) {
-      return;
-    }
 
     log.debug(String.format("Adding Edge source: %s, destination: %s, type: %s",
         edge.getSource(),
@@ -539,29 +537,7 @@ public class Neo4jGraphService implements GraphService {
     final Map<String, Object> params = new HashMap<>();
     params.put("urn", urn.toString());
 
-    Map<String, Object> relationshipMap = null;
     if (aspect != null) {
-      if (aspectSpec != null) {
-        Map<RelationshipFieldSpec, List<Object>> extractedFields =
-            FieldExtractor.extractFields(aspect, aspectSpec.getRelationshipFieldSpecs());
-        // make a nested map based on the path segments of the key of extractdFields
-        relationshipMap = new HashMap<>();
-        for (Map.Entry<RelationshipFieldSpec, List<Object>> entry : extractedFields.entrySet()) {
-          RelationshipFieldSpec relationshipFieldSpec = entry.getKey();
-          List<String> pathSegments = relationshipFieldSpec.getPath().getPathComponents();
-          Map<String, Object> currentMap = relationshipMap;
-          for (int i = 0; i < pathSegments.size() - 1; i+=1) {
-            String pathSegment = pathSegments.get(i);
-            if (!currentMap.containsKey(pathSegment)) {
-              currentMap.put(pathSegment, new HashMap<String, Object>());
-            }
-            currentMap = (Map<String, Object>) currentMap.get(pathSegment);
-          }
-          currentMap.put(pathSegments.get(pathSegments.size() - 1), entry);
-        }
-      }
-
-
       Map<String, Object> dataMap = aspect.data();
       if(dataMap.containsKey("fields")) {
         for(Map<String, Object> entry : (List<Map<String, Object>>)dataMap.get("fields")) {
@@ -572,130 +548,26 @@ public class Neo4jGraphService implements GraphService {
         }
       }
 
-      params.putAll(buildMergeQuery(ingest_query, dataMap, relationshipMap, aspect.schema().getName(), "node", true, 0));
+      String aspectName = aspect.schema().getName();
+      String json_properties = RecordUtils.toJsonString(aspect);
+      String aspectTemplate = "SET node.%s = $%s\n";
+      String propertiesIdentifier = aspectName + "_properties";
+      String aspectStatement = String.format(aspectTemplate, aspectName, propertiesIdentifier);
+      ingest_query.append(aspectStatement);
+      params.put(propertiesIdentifier, json_properties);
     }
     ingest_query.append("RETURN node\n");
     return new Statement(ingest_query.toString(), params);
   }
+
+
+  // serialize nested map to json string
 
   private static void debugPrintMap(String label, Map<String, Object> map) {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     PrintStream ps = new PrintStream(baos);
     MapUtils.debugPrint(ps, label, map);
     log.warn(baos.toString());
-  }
-
-  // TODO: This is a temporary solution to support nested aspect ingestion. We should use a better way to handle nested aspect ingestion.
-  // TODO: all the nested fields that were not updated should be removed from the graph to ensure the graph is consistent with the data.
-  // TODO: add outgoing relationship from the nested aspect to the relevant entity
-  private static Map<String, Object> buildMergeQuery(StringBuilder ingest_query, Map<String, Object> dataMap, Map<String, Object> relationshipMap, String property_name, String parentNodeIdentifier, boolean root, int seq) {
-
-    String node_identifier = parentNodeIdentifier + "_" + property_name.replace('.', '_') + "_" + seq;
-    final String mergeTemplate;
-    if (root) {
-      mergeTemplate = "MERGE (%s)<-[:ASPECT_OF { name: $name_%s, seq: %d}]-(%s:%s) SET %s = $data_%s\n";
-    } else {
-      mergeTemplate = "MERGE (%s)<-[:PROPERTY_OF { name: $name_%s, seq: %d}]-(%s:%s) SET %s = $data_%s\n";
-    }
-    final String statement = String.format(
-        mergeTemplate,
-        parentNodeIdentifier,
-        node_identifier,
-        seq,
-        node_identifier,
-        property_name.replace(".", "_"),
-        node_identifier,
-        node_identifier
-    );
-    ingest_query.append(statement);
-    // split dataMap into two maps, one for primitives or list of primitives and the other one for objects
-    Map<String, Object> primitiveMap = dataMap.entrySet().stream()
-        .filter(entry -> isPrimitiveOrListOfPrimitives(entry.getValue()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    Map<String, Object> objectMap = dataMap.entrySet().stream()
-        .filter(entry -> !isPrimitiveOrListOfPrimitives(entry.getValue()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    Map<String, Object> other_params = objectMap.entrySet().stream()
-        .flatMap(entry -> getEntryStream(ingest_query, relationshipMap, node_identifier, entry))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-    Iterator<Map.Entry<String, Object>> iter = primitiveMap.entrySet().iterator();
-    while(iter.hasNext()) {
-      Map.Entry<String, Object> entry = iter.next();
-      String key = entry.getKey();
-      Object primitive = entry.getValue();
-      if (relationshipMap == null || !relationshipMap.containsKey(key)) {
-        continue;
-      }
-      iter.remove();
-      if (primitive instanceof List) {
-        List<Object> list = (List<Object>) primitive;
-        for(int i = 0; i < list.size(); i+=1) {
-          Map<String, Object> subMap = (Map<String, Object>) relationshipMap.get(key);
-          Map.Entry<RelationshipFieldSpec, List<Object>> relationshipSpec = (Map.Entry<RelationshipFieldSpec, List<Object>>) subMap.get(FieldExtractor.getArrayWildcard());
-          establishEdge(ingest_query, other_params, node_identifier, (String) list.get(i), relationshipSpec, key + "_" + i);
-        }
-      } else {
-        Map.Entry<RelationshipFieldSpec, List<Object>> relationshipSpec = (Map.Entry<RelationshipFieldSpec, List<Object>>) relationshipMap.get(key);
-        establishEdge(ingest_query, other_params, node_identifier, (String) primitive, relationshipSpec, key + "_" + 0);
-      }
-    }
-
-    other_params.put("name_" + node_identifier, property_name);
-    other_params.put("data_" + node_identifier, primitiveMap);
-
-    return other_params;
-  }
-
-  private static void establishEdge(
-      StringBuilder ingest_query,
-      Map<String, Object> other_params,
-      String node_identifier,
-      String endpoint_urn,
-      Map.Entry<RelationshipFieldSpec, List<Object>> relationshipEntry,
-      String seq
-  ) {
-    final String relationshipEndpointIdentifier = "rel_end_urn_" + node_identifier + "_" + seq;
-    final String relationshipEndpointStatement = String.format("MERGE (%s {urn: $%s})\n",
-        relationshipEndpointIdentifier,
-        relationshipEndpointIdentifier
-    );
-    ingest_query.append(relationshipEndpointStatement);
-    other_params.put(relationshipEndpointIdentifier, endpoint_urn);
-
-    final String relationshipStatement = String.format("MERGE (%s)-[:%s]->(%s)\n", node_identifier,
-        relationshipEntry.getKey().getRelationshipName(),
-        relationshipEndpointIdentifier
-    );
-    ingest_query.append(relationshipStatement);
-  }
-
-  private static Stream<Map.Entry<String, Object>> getEntryStream(StringBuilder ingest_query,
-      Map<String, Object> relationshipMap, String node_identifier, Map.Entry<String, Object> entry) {
-    String key = entry.getKey();
-    Object value = entry.getValue();
-    Map<String, Object> relationship = null;
-    if (value instanceof List) {
-      if (relationshipMap != null && relationshipMap.containsKey(key)) {
-        Map<String, Object> temp = (Map<String, Object>) relationshipMap.get(key);
-        if (temp.containsKey(FieldExtractor.getArrayWildcard())) {
-          relationship = (Map<String, Object>) temp.get(FieldExtractor.getArrayWildcard());
-        }
-      }
-      List<Map<String, Object>> value_list = (List<Map<String, Object>>) value;
-      Map<String, Object> temp = new HashMap<>();
-      for(int i = 0; i < value_list.size(); i++) {
-        temp.putAll(buildMergeQuery(ingest_query, value_list.get(i), relationship, key, node_identifier, false, i));
-      }
-      return temp.entrySet().stream();
-    } else {
-      if(relationshipMap != null && relationshipMap.containsKey(key)) {
-        relationship = (Map<String, Object>) relationshipMap.get(key);
-      }
-      return buildMergeQuery(ingest_query, (Map<String, Object>) value, relationship, key, node_identifier, false,
-          0).entrySet().stream();
-    }
   }
 
   private static boolean isPrimitiveOrListOfPrimitives(Object object) {
