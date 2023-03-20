@@ -6,7 +6,9 @@ import com.datahub.util.exception.RetryLimitReached;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.common.urn.Urn;
+import com.linkedin.common.urn.UrnUtils;
 import com.linkedin.data.template.RecordTemplate;
+import com.linkedin.metadata.Constants;
 import com.linkedin.metadata.graph.Edge;
 import com.linkedin.metadata.graph.EntityLineageResult;
 import com.linkedin.metadata.graph.GraphFilters;
@@ -16,6 +18,7 @@ import com.linkedin.metadata.graph.LineageRelationship;
 import com.linkedin.metadata.graph.LineageRelationshipArray;
 import com.linkedin.metadata.graph.RelatedEntitiesResult;
 import com.linkedin.metadata.graph.RelatedEntity;
+import com.linkedin.metadata.key.SchemaFieldKey;
 import com.linkedin.metadata.models.AspectSpec;
 import com.linkedin.metadata.models.RelationshipFieldSpec;
 import com.linkedin.metadata.models.extractor.FieldExtractor;
@@ -26,6 +29,7 @@ import com.linkedin.metadata.query.filter.CriterionArray;
 import com.linkedin.metadata.query.filter.Filter;
 import com.linkedin.metadata.query.filter.RelationshipDirection;
 import com.linkedin.metadata.query.filter.RelationshipFilter;
+import com.linkedin.metadata.utils.EntityKeyUtils;
 import com.linkedin.metadata.utils.metrics.MetricUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -82,6 +86,9 @@ public class Neo4jGraphService implements GraphService {
 
   @Override
   public void addEdge(@Nonnull final Edge edge) {
+    if (true) {
+      return;
+    }
 
     log.debug(String.format("Adding Edge source: %s, destination: %s, type: %s",
         edge.getSource(),
@@ -115,7 +122,7 @@ public class Neo4jGraphService implements GraphService {
 
   @Override
   public void addEntity(@Nonnull Urn urn, @Nonnull RecordTemplate aspect, @Nonnull AspectSpec aspectSpec) {
-    executeStatements(List.of(getOrInsertNode(urn, aspect, aspectSpec))); // TODO
+    executeStatements(List.of(getOrInsertNode(urn, aspect, aspectSpec)));
   }
 
   @Override
@@ -525,7 +532,6 @@ public class Neo4jGraphService implements GraphService {
   private Statement getOrInsertNode(@Nonnull Urn urn, RecordTemplate aspect, AspectSpec aspectSpec) {
     final String nodeType = urn.getEntityType();
 
-
     final String mergeTemplate = "MERGE (node:%s {urn: $urn})\n";
     final String statement = String.format(mergeTemplate, nodeType);
     StringBuilder ingest_query = new StringBuilder(statement);
@@ -557,6 +563,15 @@ public class Neo4jGraphService implements GraphService {
 
 
       Map<String, Object> dataMap = aspect.data();
+      if(dataMap.containsKey("fields")) {
+        for(Map<String, Object> entry : (List<Map<String, Object>>)dataMap.get("fields")) {
+          String path = (String) entry.get("fieldPath");
+          final SchemaFieldKey key = new SchemaFieldKey().setParent(urn).setFieldPath(path);
+          Urn fieldUrn = EntityKeyUtils.convertEntityKeyToUrn(key, Constants.SCHEMA_FIELD_ENTITY_NAME);
+          entry.put("urn", fieldUrn.toString());
+        }
+      }
+
       params.putAll(buildMergeQuery(ingest_query, dataMap, relationshipMap, aspect.schema().getName(), "node", true, 0));
     }
     ingest_query.append("RETURN node\n");
