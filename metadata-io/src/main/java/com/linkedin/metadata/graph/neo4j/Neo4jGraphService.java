@@ -6,7 +6,6 @@ import com.datahub.util.exception.RetryLimitReached;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import com.linkedin.common.urn.Urn;
-import com.linkedin.common.urn.UrnUtils;
 import com.linkedin.data.template.RecordTemplate;
 import com.linkedin.metadata.Constants;
 import com.linkedin.metadata.graph.Edge;
@@ -61,6 +60,7 @@ import org.neo4j.driver.SessionConfig;
 import org.neo4j.driver.exceptions.Neo4jException;
 import org.neo4j.driver.internal.InternalRelationship;
 
+
 @Slf4j
 public class Neo4jGraphService implements GraphService {
 
@@ -73,7 +73,8 @@ public class Neo4jGraphService implements GraphService {
     this(lineageRegistry, driver, SessionConfig.defaultConfig());
   }
 
-  public Neo4jGraphService(@Nonnull LineageRegistry lineageRegistry, @Nonnull Driver driver, @Nonnull SessionConfig sessionConfig) {
+  public Neo4jGraphService(@Nonnull LineageRegistry lineageRegistry, @Nonnull Driver driver,
+      @Nonnull SessionConfig sessionConfig) {
     this._lineageRegistry = lineageRegistry;
     this._driver = driver;
     this._sessionConfig = sessionConfig;
@@ -90,10 +91,9 @@ public class Neo4jGraphService implements GraphService {
       return;
     }
 
-    log.debug(String.format("Adding Edge source: %s, destination: %s, type: %s",
-        edge.getSource(),
-        edge.getDestination(),
-        edge.getRelationshipType()));
+    log.debug(
+        String.format("Adding Edge source: %s, destination: %s, type: %s", edge.getSource(), edge.getDestination(),
+            edge.getRelationshipType()));
 
     final String sourceType = edge.getSource().getEntityType();
     final String destinationType = edge.getDestination().getEntityType();
@@ -143,65 +143,66 @@ public class Neo4jGraphService implements GraphService {
 
     final String statement = generateLineageStatement(entityUrn, direction, graphFilters, maxHops);
 
-    List<Record> neo4jResult = statement != null ? runQuery(buildStatement(statement, new HashMap<>())).list() : new ArrayList<>();
+    List<Record> neo4jResult =
+        statement != null ? runQuery(buildStatement(statement, new HashMap<>())).list() : new ArrayList<>();
 
     // It is possible to have more than 1 path from node A to node B in the graph and previous query returns all the paths.
     // We convert the List into Map with only the shortest paths. "item.get(i).size()" is the path size between two nodes in relation.
     // The key for mapping is the destination node as the source node is always the same, and it is defined by parameter.
     neo4jResult = neo4jResult.stream()
-            .collect(Collectors.toMap(item -> item.values().get(2).asNode().get("urn").asString(),
-                    Function.identity(),
-                    (item1, item2) -> item1.get(1).size() < item2.get(1).size() ? item1 : item2))
-            .values()
-            .stream()
-            .collect(Collectors.toList());
+        .collect(Collectors.toMap(item -> item.values().get(2).asNode().get("urn").asString(), Function.identity(),
+            (item1, item2) -> item1.get(1).size() < item2.get(1).size() ? item1 : item2))
+        .values()
+        .stream()
+        .collect(Collectors.toList());
 
     LineageRelationshipArray relations = new LineageRelationshipArray();
-    neo4jResult.stream()
-            .skip(offset).limit(count)
-            .forEach(item -> {
-              String urn = item.values().get(2).asNode().get("urn").asString();
-              String relationType = ((InternalRelationship) item.get(1).asList().get(0)).type();
-              int numHops = item.get(1).size();
-              try {
-                relations.add(new LineageRelationship()
-                        .setEntity(Urn.createFromString(urn))
-                        .setType(relationType)
-                        .setDegree(numHops));
-              } catch (URISyntaxException ignored) {
-                log.warn(String.format("Can't convert urn = %s, Error = %s", urn, ignored.getMessage()));
-              }
-            });
+    neo4jResult.stream().skip(offset).limit(count).forEach(item -> {
+      String urn = item.values().get(2).asNode().get("urn").asString();
+      String relationType = ((InternalRelationship) item.get(1).asList().get(0)).type();
+      int numHops = item.get(1).size();
+      try {
+        relations.add(
+            new LineageRelationship().setEntity(Urn.createFromString(urn)).setType(relationType).setDegree(numHops));
+      } catch (URISyntaxException ignored) {
+        log.warn(String.format("Can't convert urn = %s, Error = %s", urn, ignored.getMessage()));
+      }
+    });
 
     EntityLineageResult result = new EntityLineageResult().setStart(offset)
-            .setCount(relations.size())
-            .setRelationships(relations)
-            .setTotal(neo4jResult.size());
+        .setCount(relations.size())
+        .setRelationships(relations)
+        .setTotal(neo4jResult.size());
 
     log.debug(String.format("Neo4j getLineage results = %s", result));
     return result;
   }
 
-  private String generateLineageStatement(@Nonnull Urn entityUrn, @Nonnull LineageDirection direction, GraphFilters graphFilters, int maxHops) {
-    final String multiHopTemplateDirect = "MATCH shortestPath((a {urn: '%s'})-[r:%s*1..%d]->(b)) WHERE (b:%s) AND b.urn <> '%s' RETURN a,r,b";
-    final String multiHopTemplateIndirect = "MATCH shortestPath((a {urn: '%s'})<-[r:%s*1..%d]-(b)) WHERE (b:%s) AND b.urn <> '%s' RETURN a,r,b";
+  private String generateLineageStatement(@Nonnull Urn entityUrn, @Nonnull LineageDirection direction,
+      GraphFilters graphFilters, int maxHops) {
+    final String multiHopTemplateDirect =
+        "MATCH shortestPath((a {urn: '%s'})-[r:%s*1..%d]->(b)) WHERE (b:%s) AND b.urn <> '%s' RETURN a,r,b";
+    final String multiHopTemplateIndirect =
+        "MATCH shortestPath((a {urn: '%s'})<-[r:%s*1..%d]-(b)) WHERE (b:%s) AND b.urn <> '%s' RETURN a,r,b";
 
     List<LineageRegistry.EdgeInfo> edgesToFetch =
-            getLineageRegistry().getLineageRelationships(entityUrn.getEntityType(), direction);
+        getLineageRegistry().getLineageRelationships(entityUrn.getEntityType(), direction);
 
     String upstreamRel = edgesToFetch.stream()
-            .filter(item -> item.getDirection() == RelationshipDirection.OUTGOING)
-            .map(item -> item.getType())
-            .collect(Collectors.joining("|"));
+        .filter(item -> item.getDirection() == RelationshipDirection.OUTGOING)
+        .map(item -> item.getType())
+        .collect(Collectors.joining("|"));
     String dowStreamRel = edgesToFetch.stream()
-            .filter(item -> item.getDirection() == RelationshipDirection.INCOMING)
-            .map(item -> item.getType())
-            .collect(Collectors.joining("|"));
+        .filter(item -> item.getDirection() == RelationshipDirection.INCOMING)
+        .map(item -> item.getType())
+        .collect(Collectors.joining("|"));
 
     final String allowedEntityTypes = String.join(" OR b:", graphFilters.getAllowedEntityTypes());
 
-    final String statementDirect = String.format(multiHopTemplateDirect, entityUrn, upstreamRel, maxHops, allowedEntityTypes, entityUrn);
-    final String statementIndirect = String.format(multiHopTemplateIndirect, entityUrn, dowStreamRel, maxHops, allowedEntityTypes, entityUrn);
+    final String statementDirect =
+        String.format(multiHopTemplateDirect, entityUrn, upstreamRel, maxHops, allowedEntityTypes, entityUrn);
+    final String statementIndirect =
+        String.format(multiHopTemplateIndirect, entityUrn, dowStreamRel, maxHops, allowedEntityTypes, entityUrn);
 
     String statement = null;
     if (upstreamRel.length() > 0 && dowStreamRel.length() > 0) {
@@ -215,26 +216,15 @@ public class Neo4jGraphService implements GraphService {
   }
 
   @Nonnull
-  public RelatedEntitiesResult findRelatedEntities(
-      @Nullable final List<String> sourceTypes,
-      @Nonnull final Filter sourceEntityFilter,
-      @Nullable final List<String> destinationTypes,
-      @Nonnull final Filter destinationEntityFilter,
-      @Nonnull final List<String> relationshipTypes,
-      @Nonnull final RelationshipFilter relationshipFilter,
-      final int offset,
-      final int count) {
+  public RelatedEntitiesResult findRelatedEntities(@Nullable final List<String> sourceTypes,
+      @Nonnull final Filter sourceEntityFilter, @Nullable final List<String> destinationTypes,
+      @Nonnull final Filter destinationEntityFilter, @Nonnull final List<String> relationshipTypes,
+      @Nonnull final RelationshipFilter relationshipFilter, final int offset, final int count) {
 
-    log.debug(
-        String.format("Finding related Neo4j nodes sourceType: %s, sourceEntityFilter: %s, destinationType: %s, ",
-            sourceTypes, sourceEntityFilter, destinationTypes)
-        + String.format(
-        "destinationEntityFilter: %s, relationshipTypes: %s, relationshipFilter: %s, ",
-            destinationEntityFilter, relationshipTypes, relationshipFilter)
-        + String.format(
-            "offset: %s, count: %s",
-            offset, count)
-    );
+    log.debug(String.format("Finding related Neo4j nodes sourceType: %s, sourceEntityFilter: %s, destinationType: %s, ",
+        sourceTypes, sourceEntityFilter, destinationTypes) + String.format(
+        "destinationEntityFilter: %s, relationshipTypes: %s, relationshipFilter: %s, ", destinationEntityFilter,
+        relationshipTypes, relationshipFilter) + String.format("offset: %s, count: %s", offset, count));
 
     if (sourceTypes != null && sourceTypes.isEmpty() || destinationTypes != null && destinationTypes.isEmpty()) {
       return new RelatedEntitiesResult(offset, 0, 0, Collections.emptyList());
@@ -253,7 +243,8 @@ public class Neo4jGraphService implements GraphService {
       matchTemplate = "MATCH (src %s)-[r%s %s]->(dest %s)%s";
     }
 
-    final String returnNodes = String.format("RETURN dest, type(r)"); // Return both related entity and the relationship type.
+    final String returnNodes =
+        String.format("RETURN dest, type(r)"); // Return both related entity and the relationship type.
     final String returnCount = "RETURN count(*)"; // For getting the total results.
 
     String relationshipTypeFilter = "";
@@ -263,23 +254,24 @@ public class Neo4jGraphService implements GraphService {
 
     String whereClause = computeEntityTypeWhereClause(sourceTypes, destinationTypes);
 
-  // Build Statement strings
+    // Build Statement strings
     String baseStatementString =
         String.format(matchTemplate, srcCriteria, relationshipTypeFilter, edgeCriteria, destCriteria, whereClause);
 
     log.info(baseStatementString);
 
-    final String resultStatementString = String.format("%s %s SKIP $offset LIMIT $count", baseStatementString, returnNodes);
+    final String resultStatementString =
+        String.format("%s %s SKIP $offset LIMIT $count", baseStatementString, returnNodes);
     final String countStatementString = String.format("%s %s", baseStatementString, returnCount);
 
     // Build Statements
-    final Statement resultStatement = new Statement(resultStatementString, ImmutableMap.of("offset", offset, "count", count));
-    final Statement countStatement =  new Statement(countStatementString, Collections.emptyMap());
+    final Statement resultStatement =
+        new Statement(resultStatementString, ImmutableMap.of("offset", offset, "count", count));
+    final Statement countStatement = new Statement(countStatementString, Collections.emptyMap());
 
     // Execute Queries
-    final List<RelatedEntity> relatedEntities = runQuery(resultStatement).list(record ->
-        new RelatedEntity(
-            record.values().get(1).asString(), // Relationship Type
+    final List<RelatedEntity> relatedEntities = runQuery(resultStatement).list(
+        record -> new RelatedEntity(record.values().get(1).asString(), // Relationship Type
             record.values().get(0).asNode().get("urn").asString())); // Urn TODO: Validate this works against Neo4j.
     final int totalCount = runQuery(countStatement).single().get(0).asInt();
     return new RelatedEntitiesResult(offset, relatedEntities.size(), totalCount, relatedEntities);
@@ -294,16 +286,13 @@ public class Neo4jGraphService implements GraphService {
     if (hasSourceTypes && hasDestTypes) {
       whereClause = String.format(" WHERE %s AND %s",
           sourceTypes.stream().map(type -> "src:" + type).collect(Collectors.joining(" OR ")),
-          destinationTypes.stream().map(type -> "dest:" + type).collect(Collectors.joining(" OR "))
-      );
+          destinationTypes.stream().map(type -> "dest:" + type).collect(Collectors.joining(" OR ")));
     } else if (hasSourceTypes) {
       whereClause = String.format(" WHERE %s",
-          sourceTypes.stream().map(type -> "src:" + type).collect(Collectors.joining(" OR "))
-      );
+          sourceTypes.stream().map(type -> "src:" + type).collect(Collectors.joining(" OR ")));
     } else if (hasDestTypes) {
       whereClause = String.format(" WHERE %s",
-          destinationTypes.stream().map(type -> "dest:" + type).collect(Collectors.joining(" OR "))
-      );
+          destinationTypes.stream().map(type -> "dest:" + type).collect(Collectors.joining(" OR ")));
     }
     return whereClause;
   }
@@ -322,15 +311,12 @@ public class Neo4jGraphService implements GraphService {
     runQuery(buildStatement(statement, params)).consume();
   }
 
-  public void removeEdgesFromNode(
-      @Nonnull final Urn urn,
-      @Nonnull final List<String> relationshipTypes,
+  public void removeEdgesFromNode(@Nonnull final Urn urn, @Nonnull final List<String> relationshipTypes,
       @Nonnull final RelationshipFilter relationshipFilter) {
 
-    log.debug(String.format("Removing Neo4j edge types from node with urn: %s, types: %s, filter: %s",
-        urn,
-        relationshipTypes,
-        relationshipFilter));
+    log.debug(
+        String.format("Removing Neo4j edge types from node with urn: %s, types: %s, filter: %s", urn, relationshipTypes,
+            relationshipFilter));
 
     // also delete any relationship going to or from it
     final RelationshipDirection relationshipDirection = relationshipFilter.getDirection();
@@ -356,8 +342,7 @@ public class Neo4jGraphService implements GraphService {
 
   public void removeNodesMatchingLabel(@Nonnull String labelPattern) {
     log.debug(String.format("Removing Neo4j nodes matching label %s", labelPattern));
-    final String matchTemplate =
-        "MATCH (n) WHERE any(l IN labels(n) WHERE l=~'%s') DETACH DELETE n";
+    final String matchTemplate = "MATCH (n) WHERE any(l IN labels(n) WHERE l=~'%s') DETACH DELETE n";
     final String statement = String.format(matchTemplate, labelPattern);
 
     final Map<String, Object> params = new HashMap<>();
@@ -534,7 +519,7 @@ public class Neo4jGraphService implements GraphService {
 
     final String mergeTemplate = "MERGE (node:%s {urn: $urn})\n";
     final String statement = String.format(mergeTemplate, nodeType);
-    StringBuilder ingest_query = new StringBuilder(statement);
+    StringBuilder ingestQuery = new StringBuilder(statement);
 
     final Map<String, Object> params = new HashMap<>();
     params.put("urn", urn.toString());
@@ -550,7 +535,7 @@ public class Neo4jGraphService implements GraphService {
           RelationshipFieldSpec relationshipFieldSpec = entry.getKey();
           List<String> pathSegments = relationshipFieldSpec.getPath().getPathComponents();
           Map<String, Object> currentMap = relationshipMap;
-          for (int i = 0; i < pathSegments.size() - 1; i+=1) {
+          for (int i = 0; i < pathSegments.size() - 1; i += 1) {
             String pathSegment = pathSegments.get(i);
             if (!currentMap.containsKey(pathSegment)) {
               currentMap.put(pathSegment, new HashMap<String, Object>());
@@ -560,11 +545,9 @@ public class Neo4jGraphService implements GraphService {
           currentMap.put(pathSegments.get(pathSegments.size() - 1), entry);
         }
       }
-
-
       Map<String, Object> dataMap = aspect.data();
-      if(dataMap.containsKey("fields")) {
-        for(Map<String, Object> entry : (List<Map<String, Object>>)dataMap.get("fields")) {
+      if (dataMap.containsKey("fields")) {
+        for (Map<String, Object> entry : (List<Map<String, Object>>) dataMap.get("fields")) {
           String path = (String) entry.get("fieldPath");
           final SchemaFieldKey key = new SchemaFieldKey().setParent(urn).setFieldPath(path);
           Urn fieldUrn = EntityKeyUtils.convertEntityKeyToUrn(key, Constants.SCHEMA_FIELD_ENTITY_NAME);
@@ -572,10 +555,10 @@ public class Neo4jGraphService implements GraphService {
         }
       }
 
-      params.putAll(buildMergeQuery(ingest_query, dataMap, relationshipMap, aspect.schema().getName(), "node", true, 0));
+      params.putAll(buildMergeQuery(ingestQuery, dataMap, relationshipMap, aspect.schema().getName(), "node", true, 0));
     }
-    ingest_query.append("RETURN node\n");
-    return new Statement(ingest_query.toString(), params);
+    ingestQuery.append("RETURN node\n");
+    return new Statement(ingestQuery.toString(), params);
   }
 
   private static void debugPrintMap(String label, Map<String, Object> map) {
@@ -588,40 +571,49 @@ public class Neo4jGraphService implements GraphService {
   // TODO: This is a temporary solution to support nested aspect ingestion. We should use a better way to handle nested aspect ingestion.
   // TODO: all the nested fields that were not updated should be removed from the graph to ensure the graph is consistent with the data.
   // TODO: add outgoing relationship from the nested aspect to the relevant entity
-  private static Map<String, Object> buildMergeQuery(StringBuilder ingest_query, Map<String, Object> dataMap, Map<String, Object> relationshipMap, String property_name, String parentNodeIdentifier, boolean root, int seq) {
 
-    String node_identifier = parentNodeIdentifier + "_" + property_name.replace('.', '_') + "_" + seq;
+  /**
+   * Builds a query that either constructs a LPG sub-graph or updates an existing it. The query is build recursively on
+   * the basis of MERGE statements
+   * @param ingestQuery A stringbuilder which will be used to construct the query, must contain the query that inserts the root node of the LPG
+   * @param dataMap the map containing the aspect data
+   * @param relationshipMap the map containing the relationship data
+   * @param propertyName the name of the property that is being processed
+   * @param parentNodeIdentifier the identifier of the parent node
+   * @param root whether the property is a root property
+   * @param seq the sequence number of the property in case it is part of a list
+   * @return a map containing the parameters that need to be passed to the query when it is executed
+   */
+  private static Map<String, Object> buildMergeQuery(StringBuilder ingestQuery, Map<String, Object> dataMap,
+      Map<String, Object> relationshipMap, String propertyName, String parentNodeIdentifier, boolean root, int seq) {
+
+    String nodeIdentifier = parentNodeIdentifier + "_" + propertyName.replace('.', '_') + "_" + seq;
     final String mergeTemplate;
     if (root) {
       mergeTemplate = "MERGE (%s)<-[:ASPECT_OF { name: $name_%s, seq: %d}]-(%s:%s) SET %s = $data_%s\n";
     } else {
       mergeTemplate = "MERGE (%s)<-[:PROPERTY_OF { name: $name_%s, seq: %d}]-(%s:%s) SET %s = $data_%s\n";
     }
-    final String statement = String.format(
-        mergeTemplate,
-        parentNodeIdentifier,
-        node_identifier,
-        seq,
-        node_identifier,
-        property_name.replace(".", "_"),
-        node_identifier,
-        node_identifier
-    );
-    ingest_query.append(statement);
+    final String statement = String.format(mergeTemplate, parentNodeIdentifier, nodeIdentifier, seq, nodeIdentifier,
+        propertyName.replace(".", "_"), nodeIdentifier, nodeIdentifier);
+    ingestQuery.append(statement);
     // split dataMap into two maps, one for primitives or list of primitives and the other one for objects
-    Map<String, Object> primitiveMap = dataMap.entrySet().stream()
+    Map<String, Object> primitiveMap = dataMap.entrySet()
+        .stream()
         .filter(entry -> isPrimitiveOrListOfPrimitives(entry.getValue()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    Map<String, Object> objectMap = dataMap.entrySet().stream()
+    Map<String, Object> objectMap = dataMap.entrySet()
+        .stream()
         .filter(entry -> !isPrimitiveOrListOfPrimitives(entry.getValue()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-    Map<String, Object> other_params = objectMap.entrySet().stream()
-        .flatMap(entry -> getEntryStream(ingest_query, relationshipMap, node_identifier, entry))
+    Map<String, Object> otherParams = objectMap.entrySet()
+        .stream()
+        .flatMap(entry -> buildMergeQueryRecurse(ingestQuery, relationshipMap, nodeIdentifier, entry))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
     Iterator<Map.Entry<String, Object>> iter = primitiveMap.entrySet().iterator();
-    while(iter.hasNext()) {
+    while (iter.hasNext()) {
       Map.Entry<String, Object> entry = iter.next();
       String key = entry.getKey();
       Object primitive = entry.getValue();
@@ -631,48 +623,51 @@ public class Neo4jGraphService implements GraphService {
       iter.remove();
       if (primitive instanceof List) {
         List<Object> list = (List<Object>) primitive;
-        for(int i = 0; i < list.size(); i+=1) {
+        for (int i = 0; i < list.size(); i += 1) {
           Map<String, Object> subMap = (Map<String, Object>) relationshipMap.get(key);
-          Map.Entry<RelationshipFieldSpec, List<Object>> relationshipSpec = (Map.Entry<RelationshipFieldSpec, List<Object>>) subMap.get(FieldExtractor.getArrayWildcard());
-          establishEdge(ingest_query, other_params, node_identifier, (String) list.get(i), relationshipSpec, key + "_" + i);
+          Map.Entry<RelationshipFieldSpec, List<Object>> relationshipSpec =
+              (Map.Entry<RelationshipFieldSpec, List<Object>>) subMap.get(FieldExtractor.getArrayWildcard());
+          establishEdge(ingestQuery, otherParams, nodeIdentifier, (String) list.get(i), relationshipSpec,
+              key + "_" + i);
         }
       } else {
-        Map.Entry<RelationshipFieldSpec, List<Object>> relationshipSpec = (Map.Entry<RelationshipFieldSpec, List<Object>>) relationshipMap.get(key);
-        establishEdge(ingest_query, other_params, node_identifier, (String) primitive, relationshipSpec, key + "_" + 0);
+        Map.Entry<RelationshipFieldSpec, List<Object>> relationshipSpec =
+            (Map.Entry<RelationshipFieldSpec, List<Object>>) relationshipMap.get(key);
+        establishEdge(ingestQuery, otherParams, nodeIdentifier, (String) primitive, relationshipSpec, key + "_" + 0);
       }
     }
 
-    other_params.put("name_" + node_identifier, property_name);
-    other_params.put("data_" + node_identifier, primitiveMap);
+    otherParams.put("name_" + nodeIdentifier, propertyName);
+    otherParams.put("data_" + nodeIdentifier, primitiveMap);
 
-    return other_params;
+    return otherParams;
   }
 
-  private static void establishEdge(
-      StringBuilder ingest_query,
-      Map<String, Object> other_params,
-      String node_identifier,
-      String endpoint_urn,
-      Map.Entry<RelationshipFieldSpec, List<Object>> relationshipEntry,
-      String seq
-  ) {
-    final String relationshipEndpointIdentifier = "rel_end_urn_" + node_identifier + "_" + seq;
-    final String relationshipEndpointStatement = String.format("MERGE (%s {urn: $%s})\n",
-        relationshipEndpointIdentifier,
-        relationshipEndpointIdentifier
-    );
-    ingest_query.append(relationshipEndpointStatement);
-    other_params.put(relationshipEndpointIdentifier, endpoint_urn);
+  /**
+   * This function is constructed in such a way that, if the endpoint of the relationship already exists (i.e. it is an
+   * already ingested entity) then that node is retrieved, otherwise it is constructed.
+   */
+  private static void establishEdge(StringBuilder ingestQuery, Map<String, Object> otherParams,
+      String nodeIdentifier, String endpointUrn, Map.Entry<RelationshipFieldSpec, List<Object>> relationshipEntry,
+      String seq) {
+    final String relationshipEndpointIdentifier = "rel_end_urn_" + nodeIdentifier + "_" + seq;
+    final String relationshipEndpointStatement =
+        String.format("MERGE (%s {urn: $%s})\n", relationshipEndpointIdentifier, relationshipEndpointIdentifier);
+    ingestQuery.append(relationshipEndpointStatement);
+    otherParams.put(relationshipEndpointIdentifier, endpointUrn);
 
-    final String relationshipStatement = String.format("MERGE (%s)-[:%s]->(%s)\n", node_identifier,
-        relationshipEntry.getKey().getRelationshipName(),
-        relationshipEndpointIdentifier
-    );
-    ingest_query.append(relationshipStatement);
+    final String relationshipStatement =
+        String.format("MERGE (%s)-[:%s]->(%s)\n", nodeIdentifier, relationshipEntry.getKey().getRelationshipName(),
+            relationshipEndpointIdentifier);
+    ingestQuery.append(relationshipStatement);
   }
 
-  private static Stream<Map.Entry<String, Object>> getEntryStream(StringBuilder ingest_query,
-      Map<String, Object> relationshipMap, String node_identifier, Map.Entry<String, Object> entry) {
+  /**
+   * This is a helper function which helps buildMergeQuery to recurse into the objectMap
+   * @return a map containing the parameters that need to be passed to the query when it is executed
+   */
+  private static Stream<Map.Entry<String, Object>> buildMergeQueryRecurse(StringBuilder ingestQuery,
+      Map<String, Object> relationshipMap, String nodeIdentifier, Map.Entry<String, Object> entry) {
     String key = entry.getKey();
     Object value = entry.getValue();
     Map<String, Object> relationship = null;
@@ -683,21 +678,25 @@ public class Neo4jGraphService implements GraphService {
           relationship = (Map<String, Object>) temp.get(FieldExtractor.getArrayWildcard());
         }
       }
-      List<Map<String, Object>> value_list = (List<Map<String, Object>>) value;
+      List<Map<String, Object>> valueList = (List<Map<String, Object>>) value;
       Map<String, Object> temp = new HashMap<>();
-      for(int i = 0; i < value_list.size(); i++) {
-        temp.putAll(buildMergeQuery(ingest_query, value_list.get(i), relationship, key, node_identifier, false, i));
+      for (int i = 0; i < valueList.size(); i++) {
+        temp.putAll(buildMergeQuery(ingestQuery, valueList.get(i), relationship, key, nodeIdentifier, false, i));
       }
       return temp.entrySet().stream();
     } else {
-      if(relationshipMap != null && relationshipMap.containsKey(key)) {
+      if (relationshipMap != null && relationshipMap.containsKey(key)) {
         relationship = (Map<String, Object>) relationshipMap.get(key);
       }
-      return buildMergeQuery(ingest_query, (Map<String, Object>) value, relationship, key, node_identifier, false,
+      return buildMergeQuery(ingestQuery, (Map<String, Object>) value, relationship, key, nodeIdentifier, false,
           0).entrySet().stream();
     }
   }
 
+  /**
+   * This function checks if the object is a primitive or a list of primitives. It is used to determine if the object
+   * can be stored as in the neo4j database or if it needs to be further processed.
+   */
   private static boolean isPrimitiveOrListOfPrimitives(Object object) {
     if (ClassUtils.isPrimitiveOrWrapper(object.getClass())) {
       return true;
@@ -708,9 +707,7 @@ public class Neo4jGraphService implements GraphService {
     if (!(object instanceof List)) {
       return false;
     }
-    return ((List) object)
-        .stream()
-        .allMatch(e -> !(e instanceof List) && isPrimitiveOrListOfPrimitives(e));
+    return ((List) object).stream().allMatch(e -> !(e instanceof List) && isPrimitiveOrListOfPrimitives(e));
   }
 
   @Override
