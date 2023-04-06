@@ -290,4 +290,8 @@ entities:
     keyAspect: dataHubViewKey
     aspects:
       - dataHubViewInfo
+  - name: fieldConstraint
+    keyAspect: fieldConstraintKey
+    aspects: 
+      - propertyShape
 events:

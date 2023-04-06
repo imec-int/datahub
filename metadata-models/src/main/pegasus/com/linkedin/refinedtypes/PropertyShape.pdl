@@ -1,0 +1,23 @@
+namespace com.linkedin.refinedtypes
+
+/**
+ * Aspect which stores the SHACL shape and it's name
+ */
+@Aspect = {
+  "name": "propertyShape"
+}
+record PropertyShape {
+
+  /**
+   * Display name of the Shape
+   */
+  @Searchable = {
+    "fieldType": "TEXT_PARTIAL",
+    "enableAutocomplete": true,
+    "boostScore": 10.0
+  }
+  name: optional string
+
+  shape: string
+
+}

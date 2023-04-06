@@ -4,6 +4,7 @@ import com.linkedin.dataset.SchemaFieldPath
 import com.linkedin.common.GlobalTags
 import com.linkedin.common.GlossaryTerms
 import com.linkedin.common.AuditStamp
+import com.linkedin.common.Urn
 
 /**
  * SchemaField to describe metadata related to dataset schema.
@@ -129,4 +130,18 @@ record SchemaField {
    * use this field to serialize those properties into a JSON string
    */
   jsonProps: optional string
+
+  /**
+  * The urn of the constraint shape
+  */
+  @Relationship = {
+    "name": "constraintedBy",
+    "entityTypes": [ "fieldConstraint" ]
+  }
+  @Searchable = {
+    "fieldName": "constraintedBy",
+    "fieldType": "KEYWORD",
+    "queryByDefault": false
+  }
+  constraintShape: optional Urn
 }

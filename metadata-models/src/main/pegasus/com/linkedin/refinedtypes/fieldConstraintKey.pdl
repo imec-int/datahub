@@ -1,0 +1,22 @@
+namespace com.linkedin.refinedtypes
+
+import com.linkedin.common.Urn
+
+/**
+ * Key for a Dataset
+ */
+@Aspect = {
+  "name": "fieldConstraintKey"
+}
+record FieldConstraintKey {
+  /**
+  * Unique guid or name for constraint
+  */
+  @Searchable = {
+    "fieldName": "id"
+    "fieldType": "TEXT_PARTIAL",
+    "enableAutocomplete": true,
+    "boostScore": 10.0
+  }
+  name: string
+}
