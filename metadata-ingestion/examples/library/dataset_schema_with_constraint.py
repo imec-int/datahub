@@ -16,13 +16,14 @@ from datahub.metadata.schema_classes import (
 )
 from datahub.utilities.urns.urn import Urn
 
-print("hello?")
 shape_name = "ExamplePropertyShape"
 shape_urn = str(Urn('fieldConstraint', ["TestShape"])) 
 shape = f"""
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix ex: <http://example.com/ns#> .
+
 <{shape_urn}>
 	a sh:PropertyShape ;
-	sh:path ex:email ;
 	sh:description "We need at least one email value" ;
 	sh:minCount 1 .
 """
