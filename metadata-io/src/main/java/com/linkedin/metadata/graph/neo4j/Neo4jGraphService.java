@@ -101,8 +101,8 @@ public class Neo4jGraphService implements GraphService {
     final List<Statement> statements = new ArrayList<>();
 
     // Add/Update source & destination node first
-    statements.add(getOrInsertNode(edge.getSource(), null, null));
-    statements.add(getOrInsertNode(edge.getDestination(), null, null));
+    statements.addAll(getOrInsertNode(edge.getSource(), null, null));
+    statements.addAll(getOrInsertNode(edge.getDestination(), null, null));
 
     // Add/Update relationship
     final String mergeRelationshipTemplate =
@@ -122,7 +122,7 @@ public class Neo4jGraphService implements GraphService {
 
   @Override
   public void addEntity(@Nonnull Urn urn, @Nonnull RecordTemplate aspect, @Nonnull AspectSpec aspectSpec) {
-    executeStatements(List.of(getOrInsertNode(urn, aspect, aspectSpec)));
+    executeStatements(getOrInsertNode(urn, aspect, aspectSpec));
   }
 
   @Override
@@ -514,7 +514,8 @@ public class Neo4jGraphService implements GraphService {
    * Gets Node based on Urn, if not exist, creates placeholder node.
    */
   @Nonnull
-  private Statement getOrInsertNode(@Nonnull Urn urn, RecordTemplate aspect, AspectSpec aspectSpec) {
+  private List<Statement> getOrInsertNode(@Nonnull Urn urn, RecordTemplate aspect, AspectSpec aspectSpec) {
+    List<Statement> statements = new ArrayList<>();
     final String nodeType = urn.getEntityType();
 
     final String mergeTemplate = "MERGE (node:%s {urn: $urn})\n";
@@ -555,10 +556,50 @@ public class Neo4jGraphService implements GraphService {
         }
       }
 
-      params.putAll(buildMergeQuery(ingestQuery, dataMap, relationshipMap, aspect.schema().getName(), "node", true, 0));
+      if (aspect.schema().getName().equals("PropertyShape")) {
+        rdfInit();
+        String shape = (String) dataMap.get("shape");
+        Map<String, Object> opts = new HashMap<>();
+        opts.put("shape", shape);
+        Statement s = new Statement("CALL n10s.rdf.import.inline($shape, \"Turtle\")", opts);
+        statements.add(s);
+      } else {
+        params.putAll(buildMergeQuery(ingestQuery, dataMap, relationshipMap, aspect.schema().getName(), "node", true, 0));
+      }
     }
     ingestQuery.append("RETURN node\n");
-    return new Statement(ingestQuery.toString(), params);
+    statements.add( new Statement(ingestQuery.toString(), params));
+    return statements;
+  }
+
+  private boolean rdfReady = false;
+  private void rdfInit() {
+    if (rdfReady) {
+      return;
+    }
+//    statements.add(new Statement("CALL n10s.graphconfig.drop;", Collections.emptyMap()));
+//    statements.add(new Statement("CALL n10s.graphconfig.init();", Collections.emptyMap()));
+//    statements.add(new Statement("CREATE CONSTRAINT n10s_unique_uri IF NOT EXISTS ON (r:Resource)\n" + "ASSERT r.uri IS UNIQUE;", Collections.emptyMap()));
+    Exception lastException;
+    int retry = 0;
+    try (final Session session = _driver.session(_sessionConfig)) {
+      do {
+        try {
+          session.run("CALL n10s.graphconfig.init()");
+          session.run("CREATE CONSTRAINT n10s_unique_uri IF NOT EXISTS ON (r:Resource)\n" + "ASSERT r.uri IS UNIQUE;");
+          lastException = null;
+          break;
+        } catch (Neo4jException e) {
+          lastException = e;
+        }
+      } while (++retry <= MAX_TRANSACTION_RETRY);
+    }
+
+    if (lastException != null) {
+      throw new RetryLimitReached(
+          "Failed to execute Neo4j write transaction after " + MAX_TRANSACTION_RETRY + " retries", lastException);
+    }
+    rdfReady = true;
   }
 
   private static void debugPrintMap(String label, Map<String, Object> map) {
