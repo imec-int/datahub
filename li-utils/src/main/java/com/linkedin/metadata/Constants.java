@@ -31,6 +31,7 @@ public class Constants {
   public static final String DATA_PLATFORM_ENTITY_NAME = "dataPlatform";
   public static final String GLOSSARY_TERM_ENTITY_NAME = "glossaryTerm";
   public static final String GLOSSARY_NODE_ENTITY_NAME = "glossaryNode";
+  public static final String FIELD_CONSTRAINT_ENTITY_NAME = "fieldConstraint";
   public static final String ML_FEATURE_ENTITY_NAME = "mlFeature";
   public static final String ML_FEATURE_TABLE_ENTITY_NAME = "mlFeatureTable";
   public static final String ML_MODEL_ENTITY_NAME = "mlModel";
@@ -92,6 +93,9 @@ public class Constants {
   public static final String CORP_GROUP_INFO_ASPECT_NAME = "corpGroupInfo";
   public static final String CORP_GROUP_EDITABLE_INFO_ASPECT_NAME = "corpGroupEditableInfo";
   public static final String CORP_GROUP_CREATED_TIME_INDEX_FIELD_NAME = "createdTime";
+
+  public static final String FIELD_CONSTRAINT_KEY_ASPECT_NAME = "fieldConstraintKey";
+  public static final String FIELD_CONSTRAINT_SHAPE_ASPECT_NAME = "propertyShape";
 
   // Dataset
   public static final String DATASET_KEY_ASPECT_NAME = "datasetKey";

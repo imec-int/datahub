@@ -232,6 +232,7 @@ import com.linkedin.datahub.graphql.resolvers.view.ListMyViewsResolver;
 import com.linkedin.datahub.graphql.resolvers.view.UpdateViewResolver;
 import com.linkedin.datahub.graphql.types.BrowsableEntityType;
 import com.linkedin.datahub.graphql.types.EntityType;
+import com.linkedin.datahub.graphql.types.FieldConstraintType.FieldConstraintType;
 import com.linkedin.datahub.graphql.types.LoadableType;
 import com.linkedin.datahub.graphql.types.SearchableEntityType;
 import com.linkedin.datahub.graphql.types.aspect.AspectType;
@@ -386,6 +387,8 @@ public class GmsGraphQLEngine {
     private final SchemaFieldType schemaFieldType;
     private final DataHubViewType dataHubViewType;
 
+    private final FieldConstraintType fieldConstraintType;
+
     /**
      * Configures the graph objects that can be fetched primary key.
      */
@@ -476,6 +479,7 @@ public class GmsGraphQLEngine {
         this.dataHubRoleType = new DataHubRoleType(entityClient);
         this.schemaFieldType = new SchemaFieldType();
         this.dataHubViewType = new DataHubViewType(entityClient);
+        this.fieldConstraintType = new FieldConstraintType(entityClient);
 
         // Init Lists
         this.entityTypes = ImmutableList.of(
@@ -506,7 +510,8 @@ public class GmsGraphQLEngine {
             dataHubPolicyType,
             dataHubRoleType,
             schemaFieldType,
-            dataHubViewType
+            dataHubViewType,
+            fieldConstraintType
         );
         this.loadableTypes = new ArrayList<>(entityTypes);
         this.ownerTypes = ImmutableList.of(corpUserType, corpGroupType);
