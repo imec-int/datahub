@@ -1,5 +1,5 @@
-id: mycompany-dq-model
+id: imec-datacontract-model
 entities:
   - name: dataset
     aspects:
-      - customDataQualityRules
+      - dataContract
