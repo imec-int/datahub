@@ -1,0 +1,7 @@
+namespace com.imec.datacontract
+
+record AccessRule {
+	purpose: string
+	usage: string
+	restrictions: array[string]
+}

@@ -1,0 +1,7 @@
+namespace com.imec.datacontract
+
+record DataQuality {
+	accuracy: double
+	timeliness: string
+	completeness: string
+}

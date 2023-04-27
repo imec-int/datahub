@@ -1,0 +1,16 @@
+namespace com.linkedin.metadata.key
+
+import com.linkedin.common.Urn
+
+/**
+ * Key for a Data Contract
+ */
+@Aspect = {
+  "name": "dataContractKey",
+}
+record DataContractKey {
+  /**
+  * Unique id for the data contract.
+  */
+  dataContractId: string
+}

@@ -1,0 +1,7 @@
+namespace com.imec.datacontract
+
+record DataSecurity {
+	encryption: boolean
+	authentication: boolean
+	authorization: boolean
+}

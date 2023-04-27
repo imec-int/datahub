@@ -1,0 +1,23 @@
+namespace com.imec.datacontract
+
+@Aspect = {
+  "name": "dataContract",
+  "autoRender": true,
+  "renderSpec": {
+    "displayType": "tabular", // or properties
+    "key": "rules",
+    "displayName": "Data Contract"
+  }
+}
+
+record DataContract {
+  dataAsset: string
+  accessRules: array[AccessRule]
+  dataQuality: DataQuality
+  dataSharing: string
+  dataSecurity: DataSecurity
+  intellectualProperty: string
+  disputeResolution: string
+}
+
+
