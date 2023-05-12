@@ -2,4 +2,4 @@ id: imec-datacontract-model
 entities:
   - name: dataset
     aspects:
-      - dataContract
+      - datasetContracts

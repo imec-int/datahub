@@ -1,0 +1,51 @@
+{
+  "contracts": [{
+    "dataAsset": "Latitude bounds",
+    "dataQuality": {
+      "schemaField": "latitude",
+      "minValue": -90,
+      "maxValue": 90,
+      "accuracy": 1.0
+    },
+    "dataSharing": "n/a",
+    "dataSecurity": {
+      "encryption": false,
+      "authentication": false,
+      "authorization": false
+    },
+    "intellectualProperty": "imec",
+    "disputeResolution": "None"},
+  {
+    "dataAsset": "Longitude bounds",
+    "dataQuality": {
+      "schemaField": "longitude",
+      "minValue": -180,
+      "maxValue": 180,
+      "accuracy": 1.0
+    },
+    "dataSharing": "n/a",
+    "dataSecurity": {
+      "encryption": false,
+      "authentication": false,
+      "authorization": false
+    },
+    "intellectualProperty": "imec",
+    "disputeResolution": "None"},
+  {
+    "dataAsset": "Lane bounds",
+    "dataQuality": {
+      "schemaField": "lane",
+      "minValue": 1,
+      "maxValue": 1,
+      "accuracy": 1.0
+    },
+    "dataSharing": "n/a",
+    "dataSecurity": {
+      "encryption": false,
+      "authentication": false,
+      "authorization": false
+    },
+    "intellectualProperty": "imec",
+    "disputeResolution": "None"}]
+}
+

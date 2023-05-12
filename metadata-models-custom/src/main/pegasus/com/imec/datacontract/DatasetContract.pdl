@@ -1,0 +1,10 @@
+namespace com.imec.datacontract
+
+record DatasetContract {
+  dataAsset: string
+  dataQuality: DataQuality
+  dataSharing: string
+  dataSecurity: DataSecurity
+  intellectualProperty: string
+  disputeResolution: string
+}

@@ -1,0 +1,15 @@
+namespace com.imec.datacontract
+
+@Aspect = {
+  "name": "datasetContracts",
+  "autoRender": true,
+  "renderSpec": {
+    "displayType": "tabular",
+    "key": "contracts",
+    "displayName": "Dataset Contract"
+  }
+}
+
+record DatasetContracts {
+  contracts: array[DatasetContract]
+}

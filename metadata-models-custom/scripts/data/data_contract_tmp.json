@@ -1,0 +1,15 @@
+{
+  "accessRules": [
+    {
+      "purpose": "a",
+      "usage": "b",
+      "restrictions": "[a, c]",
+      "dataq": {
+        "accuracy": 1.0,
+        "timeliness": "a",
+        "completeness": "b"
+      }
+    }
+  ]
+}
+

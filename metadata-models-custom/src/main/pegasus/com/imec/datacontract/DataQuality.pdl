@@ -1,7 +1,8 @@
 namespace com.imec.datacontract
 
 record DataQuality {
+	schemaField: string
+	minValue: double
+	maxValue: double
 	accuracy: double
-	timeliness: string
-	completeness: string
 }
